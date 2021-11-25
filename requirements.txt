@@ -1,0 +1,6 @@
+discord
+python-dotenv
+requests
+discord-components
+qrcode
+Image
