@@ -33,7 +33,7 @@ You can clone this repository and run the bot by yourself.
 Make sure your virtual environment is activated every time you run the bot.
 You can get out of the environment by running `deactivate`.
 
-Edit the `.env` file and fill in your data. If you need help with that have a look [here](https://github.com/d-hoffi/Discord-LightningTipBot/blob/main/docs/guide/env-file.md).
+Edit the `.env` file and fill in your data. If you need help with that have a look [here](https://github.com/CodelsLaw/Discord-LightningTipBot/blob/main/docs/guide/env-file.md).
 Afterwards you can run the bot with
 ```
 python src/main.py
