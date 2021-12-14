@@ -4,8 +4,7 @@ from dotenv import load_dotenv
 from bot import start_bot
 
 def main():
-
-    # load .env file
+    
     try:
         load_dotenv()
     except Exception as e:

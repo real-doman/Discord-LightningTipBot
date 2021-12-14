@@ -1,26 +1,27 @@
 import logging
 import discord
-from discord import message
-from discord.ext import commands
-from discord.ext.commands import context
 import requests
-from requests.api import request
-from discord_components import Button, DiscordComponents
 import textwrap
 import qrcode
 import io
 import os
+import json
 
-from database import create_database, get_admin_key, get_connection, create_user, get_lnurl, get_balance, \
-	does_user_exist, get_invoice_key
+from discord.ext import commands
+from discord.ext.commands import Context
+from discord_components import Button, DiscordComponents
 
 from apicalls import create_invoice, decode_invoice, pay_invoice
+from database import create_database, does_command_invoker_exist, get_admin_key, get_connection, create_user, get_lnurl, get_balance, \
+	does_user_exist, get_invoice_key
 
 
-def start_bot(bot_token : str):
+def start_bot(bot_token: str):
+	"""
+	Start bot and define commands
+	"""
 
 	logging.basicConfig(filename='lntipbot.log', filemode='w', level=logging.DEBUG)
-
 	create_database()
 
 	client = commands.Bot(command_prefix = '!', help_command = None)
@@ -32,66 +33,41 @@ def start_bot(bot_token : str):
 
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def help(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) == 0:
 			await start_command(ctx)
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def start(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
-
+		
 		if len(args) == 0:
 			await start_command(ctx)
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.check(check_if_message_is_reply)
 	async def tip(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
-
+		
 		if len(args) > 0:
 			await tip_command(ctx, *args)
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def balance(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) == 0:
 			await balance_command(ctx)
 
 	@client.command(aliases=['receive'])
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def invoice(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 		
 		if len(args) == 0:
 			await ctx.send(textwrap.dedent("""
@@ -104,29 +80,28 @@ def start_bot(bot_token : str):
 			await invoice_command(ctx, *args)
 			
 	@client.command(aliases=['send'])
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def pay(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) == 1:
-			invoice = str(args[0])
+			invoice: str = str(args[0])
 			await pay_command(ctx, invoice)
 			interaction = await client.wait_for("button_click", check=lambda inter: inter.custom_id == "pay_btn")
 
 			if interaction is not None:
 				try:
-					admin_key = get_admin_key(ctx.message.author.id)
+					admin_key: str = get_admin_key(ctx.message.author.id)
 					bot_message = await ctx.send(':hourglass: Preparing payment.\nTry to pay invoice, please wait.')
-					result = pay_invoice(invoice, admin_key)
+					result: int = pay_invoice(invoice, admin_key)
 					if result == 1:
 						balance = get_balance(ctx.message.author.id)
 						await ctx.reply(f':white_check_mark: Payment successful.\nYour new balance is {balance} sat')
 						await bot_message.delete()
+					"""elif result == 0:
+						await ctx.reply(':x: Payment failed.')
+						await bot_message.delete()
+					"""
 				except Exception as ex:
 					print(ex)
 			
@@ -139,14 +114,9 @@ def start_bot(bot_token : str):
 			"""))
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def donate(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) != 1:
 			await ctx.send(textwrap.dedent("""
@@ -160,19 +130,14 @@ def start_bot(bot_token : str):
 			await donate_command(ctx, amount)
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def lnurl(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) == 0:
-			lnurl = get_lnurl(ctx.message.author.id)
+			lnurl: str = get_lnurl(ctx.message.author.id)
 			await ctx.send(':point_down: Your LNURL:')
-			qr_code = create_qr_code(lnurl)
+			qr_code: qrcode = create_qr_code(lnurl)
 
 			with io.BytesIO() as image_binary:
 				qr_code.save(image_binary, 'PNG')
@@ -180,14 +145,9 @@ def start_bot(bot_token : str):
 				await ctx.send(f'*{lnurl}*', file=discord.File(fp=image_binary, filename='lnurl.png'))
 
 	@client.command()
+	@commands.check(does_command_invoker_exist)
 	@commands.dm_only()
 	async def paylnurl(ctx, *args):
-		while True:
-			result : int = does_user_exist(ctx.message.author.id)
-			if result != 0:
-				break
-
-			create_user(ctx.message.author.id)
 
 		if len(args) == 2:
 			lnurl = str(args[0])
@@ -231,13 +191,16 @@ def start_bot(bot_token : str):
 	client.run(bot_token)
 
 
-async def start_command(ctx):
+async def start_command(ctx: Context):
+	"""
+	Sends welcome message to user
+	"""
 
-	user_id : int = ctx.message.author.id
+	user_id: int = ctx.message.author.id
 
-	lnurl = get_lnurl(user_id)
-	balance = get_balance(user_id)
-	welcome_message = textwrap.dedent(f"""
+	lnurl: str = get_lnurl(user_id)
+	balance: int = get_balance(user_id)
+	welcome_message: str = textwrap.dedent(f"""
 	Welcome {ctx.message.author.name}.
 
 	:robot: **Wallet**
@@ -261,20 +224,24 @@ async def start_command(ctx):
 
 	:warning: **Warning**
 	This bot is still under development and you could loose your funds using it.
+	It is recommended to host this bot by yourself for your own Discord community.
 	""")
 	await ctx.send(welcome_message)
 
 
-async def tip_command(ctx, *args):
+async def tip_command(ctx: Context, *args: tuple):
+	"""
+	Send tip from user to user
+	"""
 
-	sender_id = ctx.message.author.id
-	sender_name = ctx.message.author.name
+	sender_id: int = ctx.message.author.id
+	sender_name: str = ctx.message.author.name
 
-	receiver_id = ctx.message.reference.resolved.author.id
-	receiver_name = ctx.message.reference.resolved.author.name
+	receiver_id: int = ctx.message.reference.resolved.author.id
+	receiver_name: str = ctx.message.reference.resolved.author.name
 
-	amount = int(args[0])
-	sender_balance = get_balance(sender_id)
+	amount: int = int(args[0])
+	sender_balance: int = get_balance(sender_id)
 
 	if sender_id == receiver_id:
 		await ctx.reply(":x: You can't tip yourself")
@@ -291,7 +258,7 @@ async def tip_command(ctx, *args):
 		# to update the balances the receiver creates an invoice,
 		# which gets paid automatically by the sender of the tip
 		# this happends without user interaction
-		result = send_tip(sender_id, receiver_id, amount)
+		result: int = send_tip(sender_id, receiver_id, amount)
 
 		# this is just UX stuff, the bot sends a message so that the users can follow
 		if len(args) > 1 and result == 1:
@@ -305,34 +272,42 @@ async def tip_command(ctx, *args):
 			await ctx.reply(':x: Tip failed, please try again')
 
 
-def send_tip(sender_id : int, receiver_id : int, amount : int):
+def send_tip(sender_id: int, receiver_id: int, amount: int) -> int:
+	"""
+	Create invoice and pay it automatically for "tip" command
+	Return value is used to check if payment is successful
+	"""
 
-	admin_key = get_admin_key(sender_id)
-	invoice_key = get_invoice_key(receiver_id)
-	
-	json_data = create_invoice(amount, 'tip', invoice_key)
-	invoice = json_data['payment_request']
+	admin_key: str = get_admin_key(sender_id)
+	invoice_key: str = get_invoice_key(receiver_id)
+	invoice: str = create_invoice(amount, 'tip', invoice_key)
 
 	try:
-		result = pay_invoice(invoice, admin_key)
-		if result != 0: # payment successful
+		result: int = pay_invoice(invoice, admin_key)
+		if result == 1: # payment successful
 			return 1
-		else:
+		elif result == 0:
 			return 0
 	except:
 		return 0
 
 
-async def balance_command(ctx):
+async def balance_command(ctx: Context):
+	"""
+	Send message with current user balance
+	"""
 
-	balance = get_balance(ctx.message.author.id)
+	balance: int = get_balance(ctx.message.author.id)
 	await ctx.send(f'**Your balance:** {balance} sat')
 
 
-async def invoice_command(ctx, *args):
+async def invoice_command(ctx: Context, *args: tuple):
+	"""
+	Send message with invoice (as String and qr code)
+	"""
 
-	amount = int(args[0])
-	memo = ''
+	amount: int = int(args[0])
+	memo: str = ''
 
 	if len(args) > 1:
 		for i in range(1, len(args)):
@@ -340,12 +315,9 @@ async def invoice_command(ctx, *args):
 	else:
 		memo = 'Discord-LightningTipBot deposit'
 
-	invoice_key = get_invoice_key(ctx.message.author.id)
-	
-	json_data = create_invoice(amount, memo, invoice_key)
-	invoice_string : str = str(json_data['payment_request'])
-
-	qr_code = create_qr_code(invoice_string)
+	invoice_key: str = get_invoice_key(ctx.message.author.id)
+	invoice_string: str = create_invoice(amount, memo, invoice_key)
+	qr_code: qrcode = create_qr_code(invoice_string)
 	
 	with io.BytesIO() as image_binary:
 		qr_code.save(image_binary, 'PNG')
@@ -353,7 +325,10 @@ async def invoice_command(ctx, *args):
 		await ctx.send(f'*{invoice_string}*', file=discord.File(fp=image_binary, filename='invoice.png'))
 
 
-def create_qr_code(string : str):
+def create_qr_code(string: str) -> qrcode:
+	"""
+	Create QR Code out of any string (e.g. invoice)
+	"""
 
 	try:
 		qr_code = qrcode.make(string)
@@ -362,16 +337,19 @@ def create_qr_code(string : str):
 		print(ex)
 
 
-async def pay_command(ctx, invoice : str):
+async def pay_command(ctx: Context, invoice: str):
+	"""
+	Sends message to ask user for conformation before sending the payment
+	"""
 
-	invoice_key = get_invoice_key(ctx.message.author.id)
+	invoice_key: str = get_invoice_key(ctx.message.author.id)
 	
 	decoded_invoice = decode_invoice(invoice, invoice_key)
-	invoice_amount : int = int(decoded_invoice['amount_msat'] / 1000)
-	description : str = decoded_invoice['description']
-	node_id_receiver : str = decoded_invoice['payee']
+	invoice_amount: int = int(decoded_invoice['amount_msat'] / 1000)
+	description: str = decoded_invoice['description']
+	node_id_receiver: str = decoded_invoice['payee']
 
-	message = f'''
+	message: str = f'''
 	Are you sure you want to pay this invoice?
 	*{invoice}*
 
@@ -387,18 +365,18 @@ async def pay_command(ctx, invoice : str):
 	await ctx.send(textwrap.dedent(message), components=[Button(label='Send', style=3, custom_id="pay_btn"), Button(label='Cancel', style=4, custom_id='cancel_btn')])
 
 
-async def donate_command(ctx, amount : int):
+async def donate_command(ctx: Context, amount: int):
 
-	balance = get_balance(ctx.message.author.id)
+	balance: int = get_balance(ctx.message.author.id)
 	if balance < amount:
 		await ctx.send(':x: Not enough funds')
 	elif balance >= amount:
 		# user pays invoice to tip me
-		admin_invoice_key = os.getenv('ADMIN_INVOICE_KEY')
-		invoice : str = str(create_invoice(amount, f'donation from {ctx.message.author.name}', admin_invoice_key)['payment_request'])
+		admin_invoice_key: str = os.getenv('ADMIN_INVOICE_KEY')
+		invoice: str = create_invoice(amount, f'donation from {ctx.message.author.name}', admin_invoice_key)
 
-		admin_key = get_admin_key(ctx.message.author.id)
-		result = pay_invoice(invoice, admin_key)
+		admin_key: str = get_admin_key(ctx.message.author.id)
+		result: int = pay_invoice(invoice, admin_key)
 
 		if result == 0:
 			await ctx.reply(':x: Donation failed')
@@ -406,20 +384,21 @@ async def donate_command(ctx, amount : int):
 			await ctx.reply(':fireworks: Thank you for your donation.')
 
 
-async def paylnurl_command(ctx, lnurl : str, amount : int):
+async def paylnurl_command(ctx: Context, lnurl: str, amount: int):
 	"""
+	Send payment to LNURL pay link,
 	to pay LNURL:
 	1) decode LNURL
 	2) call the decoded url
 	3) receive response and call the callback url with "?amount=1234" (in msat)
 	4) receive invoice, pay invoice
 	"""
-	amount_msat = int(amount * 1000)
+	amount_msat: int = int(amount * 1000)
 
 	# 1) decode LNURL 
-	invoice_key = get_invoice_key(ctx.message.author.id)
+	invoice_key: str = get_invoice_key(ctx.message.author.id)
 	try:
-		decoded_url : str = str(decode_invoice(lnurl, invoice_key)['domain'])
+		decoded_url: str = str(decode_invoice(lnurl, invoice_key)['domain'])
 
 		# 2) call the decoded url
 		json_data = requests.get(url=decoded_url).json()
@@ -458,9 +437,8 @@ async def paylnurl_command(ctx, lnurl : str, amount : int):
 				print(ex)
 				await ctx.send(':x: Payment failed')
 	
-	
-# do all checks below
-def check_if_message_is_reply(ctx):
+
+def check_if_message_is_reply(ctx: Context) -> int:
 
 	result = ctx.message.reference
 
