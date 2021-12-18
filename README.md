@@ -9,7 +9,7 @@ This repository can be used to host your own Lightning Tip Bot for Discord serve
 * Lightning Node with [LNbits](https://github.com/lnbits/lnbits-legend)
 * public https domain pointing to your lnbits
 
-Here is an englisch [video tutorial](https://www.youtube.com/watch?v=ZIvExdnN1PQ&t) for the last requirement. An alternative is to use my [lnbits instance](lightningtipbot.com), than you run the bot yourself, but still using my Lightning Node. Just create a wallet and fill in the relevant data in the `.env` file later.
+Here is an englisch [video tutorial](https://www.youtube.com/watch?v=ZIvExdnN1PQ&t) for the last requirement. An alternative is to use my [lnbits instance](https://lightningtipbot.com), than you run the bot yourself, but still using my Lightning Node. Just create a wallet and fill in the relevant data in the `.env` file later.
 
 ## Local development
 
