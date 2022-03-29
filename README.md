@@ -46,3 +46,5 @@ If you don't want to run the bot by yourself, you can add my bot [here](https://
 This Bot is a custodial Lightning Wallet. If not self hosted all funds will be controlled by someone else, so be careful with it.
 Also it is still on an early stage of development, keep that in mind while using it.
 I am also happy about improvements or feedback in general.
+
+Also there is no guarante that my services and links are runing/working. 
